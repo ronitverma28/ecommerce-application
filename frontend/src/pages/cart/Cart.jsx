@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -7,6 +7,7 @@ import {
   removeFromCart,
   clearCart,
   clearError,
+  optimisticUpdateQuantity,
 } from "../../store/slices/cartSlice";
 import {
   FiArrowLeft,
@@ -20,10 +21,9 @@ import LoadingSpinner from "../../components/common/LoadingSpinner";
 
 export default function Cart() {
   const dispatch = useDispatch();
+  const [updatingItems, setUpdatingItems] = useState({});
 
-  const { cart, loading, error } = useSelector(
-    (state) => state.cart
-  );
+  const { cart, loading, error } = useSelector((state) => state.cart);
 
   useEffect(() => {
     dispatch(fetchCart());
@@ -36,20 +36,52 @@ export default function Cart() {
     }
   }, [error, dispatch]);
 
-  const handleUpdateQuantity = async (itemId, quantity) => {
-    if (quantity < 1) {
+  const handleUpdateQuantity = async (itemId, newQuantity) => {
+    if (newQuantity < 1 || updatingItems[itemId]) {
       return;
     }
+
+    const item = cart?.items?.find((item) => item.id === itemId);
+
+    if (!item) {
+      return;
+    }
+
+    const previousQuantity = item.quantity;
+
+    setUpdatingItems((prev) => ({
+      ...prev,
+      [itemId]: true,
+    }));
+
+    dispatch(
+      optimisticUpdateQuantity({
+        cartItemId: itemId,
+        quantity: newQuantity,
+      }),
+    );
 
     try {
       await dispatch(
         updateCartItem({
           cartItemId: itemId,
-          quantity,
-        })
+          quantity: newQuantity,
+        }),
       ).unwrap();
     } catch (err) {
       toast.error(err || "Failed to update cart");
+
+      dispatch(
+        optimisticUpdateQuantity({
+          cartItemId: itemId,
+          quantity: previousQuantity,
+        }),
+      );
+    } finally {
+      setUpdatingItems((prev) => ({
+        ...prev,
+        [itemId]: false,
+      }));
     }
   };
 
@@ -63,11 +95,7 @@ export default function Cart() {
   };
 
   const handleClearCart = async () => {
-    if (
-      window.confirm(
-        "Are you sure you want to clear your cart?"
-      )
-    ) {
+    if (window.confirm("Are you sure you want to clear your cart?")) {
       try {
         await dispatch(clearCart()).unwrap();
         toast.success("Cart cleared");
@@ -114,8 +142,7 @@ export default function Cart() {
             </h2>
 
             <p className="mt-2 text-gray-500 max-w-md mx-auto">
-              Looks like you haven't added anything to your
-              cart yet.
+              Looks like you haven't added anything to your cart yet.
             </p>
 
             <Link
@@ -136,10 +163,7 @@ export default function Cart() {
                   </h2>
 
                   <p className="text-sm text-gray-500 mt-1">
-                    {cart.totalItems}{" "}
-                    {cart.totalItems === 1
-                      ? "item"
-                      : "items"}{" "}
+                    {cart.totalItems} {cart.totalItems === 1 ? "item" : "items"}{" "}
                     in your cart
                   </p>
                 </div>
@@ -182,12 +206,11 @@ export default function Cart() {
                         <button
                           type="button"
                           onClick={() =>
-                            handleUpdateQuantity(
-                              item.id,
-                              item.quantity - 1
-                            )
+                            handleUpdateQuantity(item.id, item.quantity - 1)
                           }
-                          disabled={item.quantity <= 1 || loading}
+                          disabled={
+                            item.quantity <= 1 || updatingItems[item.id]
+                          }
                           className="flex h-10 w-10 items-center justify-center text-gray-600 transition hover:bg-gray-100 hover:text-indigo-600 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <FiMinus size={16} />
@@ -200,12 +223,9 @@ export default function Cart() {
                         <button
                           type="button"
                           onClick={() =>
-                            handleUpdateQuantity(
-                              item.id,
-                              item.quantity + 1
-                            )
+                            handleUpdateQuantity(item.id, item.quantity + 1)
                           }
-                          disabled={loading}
+                          disabled={updatingItems[item.id]}
                           className="flex h-10 w-10 items-center justify-center text-gray-600 transition hover:bg-gray-100 hover:text-indigo-600 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <FiPlus size={16} />
