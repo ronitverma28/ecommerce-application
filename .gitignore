@@ -1,0 +1,45 @@
+# Build tools
+target/
+
+# Maven
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/maven.config
+
+# IDEs
+.idea/
+*.iws
+*.ipr
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Frontend dependencies
+node_modules/
+dist/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Coverage
+frontend/coverage/
+
+# Database
+*.db
+*.sqlite3
+
+# Secrets
+.env
